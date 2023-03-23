@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity >=0.8.4;
+pragma abicoder v2;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -7,42 +8,111 @@ contract Registrar is Ownable {
 
     struct Data {
         address owner;
-        string name;
-        uint256 age;
-        bool isMarried;
+        string description;
+        string website;
+        string email;
+        string avatar;
     }
 
+    string public parentDomain;
+    string public tld;
     Data public ownerInfo;
 
     mapping(string => Data) public subDomainData;
     // mapping(address => bool) public registered;
 
-    modifier onlySubDomainOwner (string memory _domain, address _caller) {
-        require(subDomainData[_domain].owner == _caller, "You are not the owner of this sub-domain");
+    mapping(string => bool) public registered;
+    mapping(string => bool) public isDomainActive;
+    string[] public subDomainsList;
+
+
+    modifier onlySubDomainOwner (string memory _domain) {
+        require(subDomainData[_domain].owner == msg.sender, "You are not the owner of this sub-domain");
         _;
     }
 
-    constructor(address _domainOwner, string memory _name, uint256 _age, bool _isMarried) {
-        ownerInfo = Data({owner: msg.sender, name: _name, age: _age, isMarried: _isMarried});
+    constructor(string memory _domain, address _domainOwner, string memory _tld) {
+        tld =_tld;
+        parentDomain = _domain;
         _transferOwnership(_domainOwner);
     }
 
-    function setNewSubdomain(string memory _name) public onlyOwner {
-        subDomainData[_name] = Data({owner: owner(), name: "_", age: 0, isMarried: false});
+    // Gets all the subdomains in use
+    function getAllSubDomains() public view returns(string[] memory) {
+        string[] memory allDomains = new string[](subDomainsList.length);
+        uint256 localCounter;
+
+        for(uint256 i; i < subDomainsList.length; i++) {
+
+            if(isDomainActive[subDomainsList[i]]) {
+                allDomains[localCounter] = subDomainsList[i];
+                allDomains[localCounter] = subDomainsList[i];
+                localCounter ++;
+            }
+        }
+
+        return allDomains;
     }
 
-    function transferSubDomain(string memory _subDomain, address _newOwner) public onlySubDomainOwner(_subDomain, msg.sender) {
+    function getSubDomainsCounter() public view returns (uint256) {
+        return subDomainsList.length;
+    }
+
+    function addToSubDomainsList(string memory _subDomain) internal {
+        if(!registered[_subDomain]) {
+
+            registered[_subDomain] = true;
+            isDomainActive[_subDomain] = true;
+            subDomainsList.push(_subDomain);
+        }
+    }
+
+
+    // owner issues a new domain
+    function setNewSubdomain(string memory _subDomain) public onlyOwner {
+        subDomainData[_subDomain] = Data({owner: owner(), description: "_", website: "_", email: "_", avatar:"_"});
+        addToSubDomainsList(_subDomain);
+    }
+
+    // transfering a subdomain; sending to owner will reset all the info.
+    function transferSubDomain(string memory _subDomain, address _newOwner) public onlySubDomainOwner(_subDomain) {
+
+        if (_newOwner == owner()) {
+            isDomainActive[_subDomain] = false;
+        }
+
         subDomainData[_subDomain].owner = _newOwner;
+        subDomainData[_subDomain].description = "";
+        subDomainData[_subDomain].website = "";
+        subDomainData[_subDomain].email = "";
+        subDomainData[_subDomain].avatar = "";
+
     }
 
-    // needs a backwards resolver
-    function changeSubDomainData(string memory _subDomain, string memory _name, uint256 _age, bool _isMarried) public onlySubDomainOwner(_subDomain, msg.sender) {
-        subDomainData[_subDomain].name = _name;
-        subDomainData[_subDomain].age = _age;
-        subDomainData[_subDomain].isMarried = _isMarried;
+
+    // owner changes its own data
+    function setOwnerData(string memory _description, string memory _website, string memory _email, string memory _avatar) public onlyOwner {
+        ownerInfo.description =  _description;
+        ownerInfo.website =  _website;
+        ownerInfo.email = _email;
+        ownerInfo.avatar = _avatar;
+    }
+
+    //  maybe a backwards resolver?
+    function changeSubDomainData(string memory _subDomain, string memory _description, string memory _website, string memory _email, string memory _avatar) public onlySubDomainOwner(_subDomain) {
+        subDomainData[_subDomain].description =  _description;
+        subDomainData[_subDomain].website =  _website;
+        subDomainData[_subDomain].email = _email;
+        subDomainData[_subDomain].avatar = _avatar;
+    }
+
+    // resets all info and tranfers to zero address
+    function deleteSubDomain(string memory _subDomain) public onlySubDomainOwner(_subDomain) {
+        transferSubDomain(_subDomain, owner());
     }
 
     function getOwnerData() public view returns(Data memory) {
         return ownerInfo;
     }
+
 }

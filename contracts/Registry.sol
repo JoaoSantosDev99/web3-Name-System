@@ -7,9 +7,10 @@ contract Registry {
 
     struct Data {
         address owner;
-        string name;
-        uint256 age;
-        bool isMarried;
+        string description;
+        string website;
+        string email;
+        string avatar;
     }
 
     struct Pointer {
@@ -17,25 +18,28 @@ contract Registry {
         address registrar;
     }
 
-    mapping(string => Pointer) public registry;
-    // mapping(address => bool) public registered;
+    string constant public TLD = "inu";
 
-    function newDomain(string memory _domain, string memory _name, uint256 _age, bool _isMarried) public {
-        // require(!registered[msg.sender], "This addres is already registered");
+    mapping(string => Pointer) public registry;
+    // mapping(address => string) public primaryDomain;
+    // mapping(address => string[]) public domainsOwned;
+    mapping(uint256 => string) public tokenToDomain;
+
+    function newDomain(string memory _domain) public {
         require(checkAvailable(_domain), "This domain is not available");
 
-        Registrar newRegistrar = new Registrar(msg.sender, _name, _age, _isMarried);
+        Registrar newRegistrar = new Registrar(_domain, msg.sender, TLD);
         registry[_domain] = Pointer({owner: msg.sender, registrar: address(newRegistrar)});
     }
 
-    function resolveName(string memory _domain) public view returns(address _owner, string memory _name, uint256 _age, bool _isMarried, address _registrar) {
+    function resolveName(string memory _domain) public view returns(address _owner, string memory _description, string memory _website, string memory _email, string memory _avatar) {
         address owner = registry[_domain].owner;
         address registrarAddr = registry[_domain].registrar;
 
         Registrar registrar = Registrar(registrarAddr);
         Registrar.Data memory userData = registrar.getOwnerData();
 
-        return(owner, userData.name, userData.age, userData.isMarried, registrarAddr);
+        return(owner, userData.description, userData.website, userData.email, userData.avatar);
     }
 
     function checkAvailable(string memory _domain) public view returns(bool available) {
