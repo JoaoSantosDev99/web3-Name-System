@@ -2,8 +2,15 @@
 pragma solidity >=0.8.4;
 
 import "./Registrar.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 
-contract Registry {
+contract Registry is ERC721, ERC721Enumerable, Ownable {
+
+    using Counters for Counters.Counter;
+    Counters.Counter private _tokenIdCounter;
 
     struct Data {
         address owner;
@@ -25,10 +32,37 @@ contract Registry {
     // mapping(address => string[]) public domainsOwned;
     mapping(uint256 => string) public tokenToDomain;
 
+
+    constructor() ERC721("Registry", "INU") {}
+
+    function _beforeTokenTransfer(address from, address to, uint256 tokenId, uint256 batchSize)
+        internal
+        override(ERC721, ERC721Enumerable)
+    {
+        address registrarAddr = registry[tokenToDomain[tokenId]].registrar;
+        Registrar(registrarAddr).transfer(to);
+        super._beforeTokenTransfer(from, to, tokenId, batchSize);
+    }
+
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        override(ERC721, ERC721Enumerable)
+        returns (bool)
+    {
+        return super.supportsInterface(interfaceId);
+    }
+
     function newDomain(string memory _domain) public {
         require(checkAvailable(_domain), "This domain is not available");
 
-        Registrar newRegistrar = new Registrar(_domain, msg.sender, TLD);
+        uint256 tokenId = _tokenIdCounter.current();
+        _tokenIdCounter.increment();
+        _safeMint(msg.sender, tokenId);
+
+        tokenToDomain[tokenId] = _domain;
+
+        Registrar newRegistrar = new Registrar(_domain, msg.sender);
         registry[_domain] = Pointer({owner: msg.sender, registrar: address(newRegistrar)});
     }
 
@@ -43,6 +77,6 @@ contract Registry {
     }
 
     function checkAvailable(string memory _domain) public view returns(bool available) {
-        return registry[_domain].owner == 0x0000000000000000000000000000000000000000;
+        return registry[_domain].owner == address(0);
     }
 }

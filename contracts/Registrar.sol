@@ -15,7 +15,8 @@ contract Registrar is Ownable {
     }
 
     string public parentDomain;
-    string public tld;
+    address public registryContractAddr;
+
     Data public ownerInfo;
 
     mapping(string => Data) public subDomainData;
@@ -31,10 +32,17 @@ contract Registrar is Ownable {
         _;
     }
 
-    constructor(string memory _domain, address _domainOwner, string memory _tld) {
-        tld =_tld;
+
+    constructor(string memory _domain, address _domainOwner) {
         parentDomain = _domain;
+        registryContractAddr = msg.sender;
         _transferOwnership(_domainOwner);
+        ownerInfo.owner = _domainOwner;
+    }
+
+    function transfer(address _newOwner) public {
+        require(msg.sender == registryContractAddr, "Caller is not Registry");
+        _transferOwnership(_newOwner);
     }
 
     // Gets all the subdomains in use
@@ -70,6 +78,7 @@ contract Registrar is Ownable {
 
     // owner issues a new domain
     function setNewSubdomain(string memory _subDomain) public onlyOwner {
+        require(!registered[_subDomain], "This subdomain already exists!");
         subDomainData[_subDomain] = Data({owner: owner(), description: "_", website: "_", email: "_", avatar:"_"});
         addToSubDomainsList(_subDomain);
     }
@@ -81,12 +90,15 @@ contract Registrar is Ownable {
             isDomainActive[_subDomain] = false;
         }
 
+        if (msg.sender == owner() && !isDomainActive[_subDomain]) {
+            isDomainActive[_subDomain] = true;
+        }
+
         subDomainData[_subDomain].owner = _newOwner;
         subDomainData[_subDomain].description = "";
         subDomainData[_subDomain].website = "";
         subDomainData[_subDomain].email = "";
         subDomainData[_subDomain].avatar = "";
-
     }
 
 
@@ -116,3 +128,9 @@ contract Registrar is Ownable {
     }
 
 }
+
+// jay.inu
+
+// test.jay.inu 0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2
+// sub.jay.inu  0x617F2E2fD72FD9D5503197092aC168c91465E7f2
+// jessica.jay.inu  owner
