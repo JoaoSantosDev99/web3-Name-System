@@ -20,8 +20,7 @@ contract Registrar is Ownable {
     Data public ownerInfo;
 
     mapping(string => Data) public subDomainData;
-    // mapping(address => bool) public registered;
-
+    mapping(address => bool) public hasSubDomain;
     mapping(string => bool) public registered;
     mapping(string => bool) public isDomainActive;
     string[] public subDomainsList;
@@ -31,7 +30,6 @@ contract Registrar is Ownable {
         require(subDomainData[_domain].owner == msg.sender, "You are not the owner of this sub-domain");
         _;
     }
-
 
     constructor(string memory _domain, address _domainOwner) {
         parentDomain = _domain;
@@ -75,10 +73,11 @@ contract Registrar is Ownable {
         }
     }
 
-
     // owner issues a new domain
     function setNewSubdomain(string memory _subDomain) public onlyOwner {
         require(!registered[_subDomain], "This subdomain already exists!");
+        require(validateName(_subDomain), "This is not a valid domain name!");
+
         subDomainData[_subDomain] = Data({owner: owner(), description: "_", website: "_", email: "_", avatar:"_"});
         addToSubDomainsList(_subDomain);
     }
@@ -87,11 +86,13 @@ contract Registrar is Ownable {
     function transferSubDomain(string memory _subDomain, address _newOwner) public onlySubDomainOwner(_subDomain) {
 
         if (_newOwner == owner()) {
+            hasSubDomain[msg.sender] = false;
             isDomainActive[_subDomain] = false;
         }
 
         if (msg.sender == owner() && !isDomainActive[_subDomain]) {
             isDomainActive[_subDomain] = true;
+            hasSubDomain[_newOwner] = true;
         }
 
         subDomainData[_subDomain].owner = _newOwner;
@@ -100,7 +101,6 @@ contract Registrar is Ownable {
         subDomainData[_subDomain].email = "";
         subDomainData[_subDomain].avatar = "";
     }
-
 
     // owner changes its own data
     function setOwnerData(string memory _description, string memory _website, string memory _email, string memory _avatar) public onlyOwner {
@@ -123,14 +123,25 @@ contract Registrar is Ownable {
         transferSubDomain(_subDomain, owner());
     }
 
-    function getOwnerData() public view returns(Data memory) {
-        return ownerInfo;
+    function validateName(string memory str) internal pure returns (bool) {
+        bytes memory b = bytes(str);
+        if (b.length < 1) return false;
+        if (b.length > 40) return false;
+        if (b[0] == 0x20) return false;
+        if (b[b.length - 1] == 0x20) return false;
+
+        for (uint i; i < b.length; i++) {
+            bytes1 char = b[i];
+
+            if (char == 0x20) return false;
+
+            if (
+                !(char >= 0x30 && char <= 0x39) &&
+                !(char >= 0x61 && char <= 0x7A) &&
+                !(char == 0x2D)
+            ) return false;
+        }
+        return true;
     }
 
 }
-
-// jay.inu
-
-// test.jay.inu 0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2
-// sub.jay.inu  0x617F2E2fD72FD9D5503197092aC168c91465E7f2
-// jessica.jay.inu  owner

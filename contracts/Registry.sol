@@ -28,8 +28,7 @@ contract Registry is ERC721, ERC721Enumerable, Ownable {
     string constant public TLD = "inu";
 
     mapping(string => Pointer) public registry;
-    // mapping(address => string) public primaryDomain;
-    // mapping(address => string[]) public domainsOwned;
+    mapping(address => string) public primaryDomain;
     mapping(uint256 => string) public tokenToDomain;
 
 
@@ -41,7 +40,21 @@ contract Registry is ERC721, ERC721Enumerable, Ownable {
     {
         address registrarAddr = registry[tokenToDomain[tokenId]].registrar;
         Registrar(registrarAddr).transfer(to);
+        registry[tokenToDomain[tokenId]].owner = to;
         super._beforeTokenTransfer(from, to, tokenId, batchSize);
+
+
+        if (balanceOf(to) == 0) {
+            primaryDomain[to] = tokenToDomain[tokenId];
+
+            if ( keccak256(abi.encodePacked(primaryDomain[from])) == keccak256(abi.encodePacked(tokenToDomain[tokenId]))) {
+                primaryDomain[from] = "";
+            }
+        }
+
+        if (keccak256(abi.encodePacked(primaryDomain[from])) == keccak256(abi.encodePacked(tokenToDomain[tokenId])) ) {
+            primaryDomain[from] = "";
+        }
     }
 
     function supportsInterface(bytes4 interfaceId)
@@ -55,28 +68,54 @@ contract Registry is ERC721, ERC721Enumerable, Ownable {
 
     function newDomain(string memory _domain) public {
         require(checkAvailable(_domain), "This domain is not available");
+        require(validateName(_domain), "This is not a valid domain name!");
 
         uint256 tokenId = _tokenIdCounter.current();
         _tokenIdCounter.increment();
-        _safeMint(msg.sender, tokenId);
 
         tokenToDomain[tokenId] = _domain;
 
         Registrar newRegistrar = new Registrar(_domain, msg.sender);
         registry[_domain] = Pointer({owner: msg.sender, registrar: address(newRegistrar)});
+
+        _safeMint(msg.sender, tokenId);
+
     }
 
-    function resolveName(string memory _domain) public view returns(address _owner, string memory _description, string memory _website, string memory _email, string memory _avatar) {
-        address owner = registry[_domain].owner;
+    function resolveName(string memory _domain) public view returns(address,string memory,string memory,string memory,string memory) {
         address registrarAddr = registry[_domain].registrar;
-
         Registrar registrar = Registrar(registrarAddr);
-        Registrar.Data memory userData = registrar.getOwnerData();
+        return(registrar.ownerInfo());
+    }
 
-        return(owner, userData.description, userData.website, userData.email, userData.avatar);
+    function setPrimaryDomain(string memory _domain) public {
+        require(registry[_domain].owner == msg.sender, "You are not the onwer of this domain!");
+        require(keccak256(abi.encodePacked(primaryDomain[msg.sender])) != keccak256(abi.encodePacked(_domain)), "This is already your primary domain!");
+        primaryDomain[msg.sender] = _domain;
     }
 
     function checkAvailable(string memory _domain) public view returns(bool available) {
         return registry[_domain].owner == address(0);
+    }
+
+    function validateName(string memory str) internal pure returns (bool) {
+        bytes memory b = bytes(str);
+        if (b.length < 1) return false;
+        if (b.length > 40) return false;
+        if (b[0] == 0x20) return false;
+        if (b[b.length - 1] == 0x20) return false;
+
+        for (uint i; i < b.length; i++) {
+            bytes1 char = b[i];
+
+            if (char == 0x20) return false;
+
+            if (
+                !(char >= 0x30 && char <= 0x39) &&
+                !(char >= 0x61 && char <= 0x7A) &&
+                !(char == 0x2D)
+            ) return false;
+        }
+        return true;
     }
 }
