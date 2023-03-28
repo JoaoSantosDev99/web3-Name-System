@@ -60,10 +60,6 @@ contract Registrar is Ownable {
         return allDomains;
     }
 
-    function getSubDomainsCounter() public view returns (uint256) {
-        return subDomainsList.length;
-    }
-
     function addToSubDomainsList(string memory _subDomain) internal {
         if(!registered[_subDomain]) {
 
@@ -84,6 +80,10 @@ contract Registrar is Ownable {
 
     // transfering a subdomain; sending to owner will reset all the info.
     function transferSubDomain(string memory _subDomain, address _newOwner) public onlySubDomainOwner(_subDomain) {
+        // require(hasSubDomain[msg.sender] = false)
+        // owner cannot send to himself
+        // cant send to somebody that already has a subdomain
+
 
         if (_newOwner == owner()) {
             hasSubDomain[msg.sender] = false;
