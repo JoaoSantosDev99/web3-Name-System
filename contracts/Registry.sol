@@ -81,13 +81,6 @@ contract Registry is ERC721, ERC721Enumerable, Ownable {
         _safeMint(msg.sender, tokenId);
 
     }
-
-    function resolveName(string memory _domain) public view returns(address,string memory,string memory,string memory,string memory) {
-        address registrarAddr = registry[_domain].registrar;
-        Registrar registrar = Registrar(registrarAddr);
-        return(registrar.ownerInfo());
-    }
-
     function setPrimaryDomain(string memory _domain) public {
         require(registry[_domain].owner == msg.sender, "You are not the onwer of this domain!");
         require(keccak256(abi.encodePacked(primaryDomain[msg.sender])) != keccak256(abi.encodePacked(_domain)), "This is already your primary domain!");

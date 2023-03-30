@@ -80,14 +80,15 @@ contract Registrar is Ownable {
 
     // transfering a subdomain; sending to owner will reset all the info.
     function transferSubDomain(string memory _subDomain, address _newOwner) public onlySubDomainOwner(_subDomain) {
-        // require(hasSubDomain[msg.sender] = false)
-        // owner cannot send to himself
-        // cant send to somebody that already has a subdomain
-
+        require(_newOwner != msg.sender, "Can't send domain to yourself!");
 
         if (_newOwner == owner()) {
             hasSubDomain[msg.sender] = false;
             isDomainActive[_subDomain] = false;
+        } else {
+            require(!hasSubDomain[_newOwner], "This address already have a subdomain!");
+            hasSubDomain[_newOwner] = true;
+            hasSubDomain[msg.sender] = false;
         }
 
         if (msg.sender == owner() && !isDomainActive[_subDomain]) {

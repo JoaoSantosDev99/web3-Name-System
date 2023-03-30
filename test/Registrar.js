@@ -217,20 +217,218 @@ describe("Registrar Instance", function () {
       expect(notTransferedSubdomain.owner).to.equal(deployer.address);
     });
 
-    it("Owner can no longer transfer a subdomain that is no longer his", async function () {
+    it("Owner cannot transfer a subdomain that is no longer his", async function () {
       const target = account2.address;
       await Registrar.transferSubDomain(subDomainA, target);
-      const transferedSubdomain = await Registrar.subDomainData(subDomainA);
 
       await expect(
         Registrar.transferSubDomain(subDomainA, target)
       ).to.be.revertedWith("You are not the owner of this sub-domain");
     });
 
-    it("New owner have a domain", async function () {});
-    it("New owner can transfer", async function () {});
-    it("New owner can delete", async function () {});
-    it("Transfer resets data", async function () {});
-    it("Transfer back to owner deletes", async function () {});
+    it("Reverts if new owner already has a subdomain", async function () {
+      const target = account1.address;
+      await Registrar.transferSubDomain(subDomainA, target);
+
+      await expect(
+        Registrar.transferSubDomain(subDomainB, target)
+      ).to.be.revertedWith("This address already have a subdomain!");
+    });
+
+    it("New owner have a domain", async function () {
+      const target = account1.address;
+      await Registrar.transferSubDomain(subDomainA, target);
+      const transferedSubdomain = await Registrar.subDomainData(subDomainA);
+      expect(transferedSubdomain.owner).to.be.equal(target);
+    });
+
+    it("New owner can transfer", async function () {
+      const targetSigner = account1;
+      const targetAddress = account1.address;
+      const secondOwner = account2.address;
+
+      await Registrar.transferSubDomain(subDomainA, targetAddress);
+
+      const unTransferedSubdomain = await Registrar.subDomainData(subDomainA);
+      expect(unTransferedSubdomain.owner).to.be.equal(targetAddress);
+
+      await Registrar.connect(targetSigner).transferSubDomain(
+        subDomainA,
+        secondOwner
+      );
+      const transferedSubdomain = await Registrar.subDomainData(subDomainA);
+      expect(transferedSubdomain.owner).to.be.equal(secondOwner);
+    });
+
+    it("Transfer resets data", async function () {
+      const subdomain = {
+        description: "descriptions text",
+        website: "vercel.com",
+        email: "vitalik@eth.com",
+        avatar: "Green Gobblin",
+      };
+
+      const targetSigner = account1;
+      const targetAddress = account1.address;
+      const secondOwner = account2.address;
+
+      await Registrar.transferSubDomain(subDomainA, targetAddress);
+
+      await Registrar.connect(targetSigner).changeSubDomainData(
+        subDomainA,
+        subdomain.description,
+        subdomain.website,
+        subdomain.email,
+        subdomain.avatar
+      );
+
+      const unTransfSubdom = await Registrar.subDomainData(subDomainA);
+
+      expect(unTransfSubdom.owner).to.be.equal(targetAddress);
+      expect(unTransfSubdom.description).to.be.equal(subdomain.description);
+      expect(unTransfSubdom.website).to.be.equal(subdomain.website);
+      expect(unTransfSubdom.email).to.be.equal(subdomain.email);
+      expect(unTransfSubdom.avatar).to.be.equal(subdomain.avatar);
+
+      expect(await Registrar.hasSubDomain(targetAddress)).to.be.true;
+      expect(await Registrar.hasSubDomain(secondOwner)).to.be.false;
+
+      await Registrar.connect(targetSigner).transferSubDomain(
+        subDomainA,
+        secondOwner
+      );
+
+      const transferedSubdomain = await Registrar.subDomainData(subDomainA);
+
+      expect(transferedSubdomain.owner).to.be.equal(secondOwner);
+      expect(transferedSubdomain.description).to.be.equal("");
+      expect(transferedSubdomain.website).to.be.equal("");
+      expect(transferedSubdomain.email).to.be.equal("");
+      expect(transferedSubdomain.avatar).to.be.equal("");
+
+      expect(await Registrar.hasSubDomain(targetAddress)).to.be.false;
+      expect(await Registrar.hasSubDomain(secondOwner)).to.be.true;
+    });
+
+    it("Transfer back to owner deactivates", async function () {
+      const subdomain = {
+        description: "descriptions text",
+        website: "vercel.com",
+        email: "vitalik@eth.com",
+        avatar: "Green Gobblin",
+      };
+
+      const targetSigner = account1;
+      const targetAddress = account1.address;
+      const owner = deployer.address;
+
+      await Registrar.transferSubDomain(subDomainA, targetAddress);
+
+      await Registrar.connect(targetSigner).changeSubDomainData(
+        subDomainA,
+        subdomain.description,
+        subdomain.website,
+        subdomain.email,
+        subdomain.avatar
+      );
+
+      const unTransfSubdom = await Registrar.subDomainData(subDomainA);
+
+      expect(unTransfSubdom.owner).to.be.equal(targetAddress);
+      expect(unTransfSubdom.description).to.be.equal(subdomain.description);
+      expect(unTransfSubdom.website).to.be.equal(subdomain.website);
+      expect(unTransfSubdom.email).to.be.equal(subdomain.email);
+      expect(unTransfSubdom.avatar).to.be.equal(subdomain.avatar);
+
+      expect(await Registrar.hasSubDomain(targetAddress)).to.be.true;
+      expect(await Registrar.isDomainActive(subDomainA)).to.be.true;
+
+      await Registrar.connect(targetSigner).transferSubDomain(
+        subDomainA,
+        owner
+      );
+
+      const transferedSubdomain = await Registrar.subDomainData(subDomainA);
+
+      expect(transferedSubdomain.owner).to.be.equal(owner);
+      expect(transferedSubdomain.description).to.be.equal("");
+      expect(transferedSubdomain.website).to.be.equal("");
+      expect(transferedSubdomain.email).to.be.equal("");
+      expect(transferedSubdomain.avatar).to.be.equal("");
+
+      expect(await Registrar.hasSubDomain(targetAddress)).to.be.false;
+      expect(await Registrar.isDomainActive(subDomainA)).to.be.false;
+    });
+
+    it("Reactivates a subdomain when the owner sends again", async function () {
+      const subdomain = {};
+
+      const targetSigner = account1;
+      const targetAddress = account1.address;
+      const owner = deployer.address;
+
+      await Registrar.transferSubDomain(subDomainA, targetAddress);
+
+      expect(await Registrar.hasSubDomain(targetAddress)).to.be.true;
+      expect(await Registrar.isDomainActive(subDomainA)).to.be.true;
+
+      await Registrar.connect(targetSigner).transferSubDomain(
+        subDomainA,
+        owner
+      );
+
+      expect(await Registrar.hasSubDomain(targetAddress)).to.be.false;
+      expect(await Registrar.isDomainActive(subDomainA)).to.be.false;
+
+      await Registrar.transferSubDomain(subDomainA, account2.address);
+
+      expect(await Registrar.hasSubDomain(account2.address)).to.be.true;
+      expect(await Registrar.isDomainActive(subDomainA)).to.be.true;
+    });
+  });
+
+  describe("Subdomain Deletion", function () {
+    const subDomainA = "subdomain-a";
+    const subDomainB = "subdomain-b";
+    const subDomainC = "subdomain-c";
+
+    beforeEach(async function () {
+      await Registrar.setNewSubdomain(subDomainA);
+      await Registrar.setNewSubdomain(subDomainB);
+    });
+
+    it("New owner can delete", async function () {
+      const targetSigner = account1;
+      const targetAddress = account1.address;
+
+      expect(await Registrar.hasSubDomain(targetAddress)).to.be.false;
+
+      await Registrar.transferSubDomain(subDomainA, targetAddress);
+
+      expect(await Registrar.hasSubDomain(targetAddress)).to.be.true;
+
+      await Registrar.connect(targetSigner).deleteSubDomain(subDomainA);
+
+      expect(await Registrar.hasSubDomain(targetAddress)).to.be.false;
+      expect(await Registrar.isDomainActive(subDomainA)).to.be.false;
+    });
+
+    it("Parent domain owner can't delete once transfered", async function () {
+      const targetSigner = account1;
+      const targetAddress = account1.address;
+
+      expect(await Registrar.hasSubDomain(targetAddress)).to.be.false;
+
+      await Registrar.transferSubDomain(subDomainA, targetAddress);
+
+      expect(await Registrar.hasSubDomain(targetAddress)).to.be.true;
+
+      await expect(Registrar.deleteSubDomain(subDomainA)).to.be.revertedWith(
+        "You are not the owner of this sub-domain"
+      );
+
+      expect(await Registrar.hasSubDomain(targetAddress)).to.be.true;
+      expect(await Registrar.isDomainActive(subDomainA)).to.be.true;
+    });
   });
 });
