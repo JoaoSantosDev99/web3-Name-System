@@ -14,24 +14,24 @@ contract Registrar is Ownable {
         string avatar;
     }
 
-    string public parentDomain;
+    bytes32 public parentDomain;
     address public registryContractAddr;
 
     Data public ownerInfo;
 
-    mapping(string => Data) public subDomainData;
+    mapping(bytes32 => Data) public subDomainData;
     mapping(address => bool) public hasSubDomain;
-    mapping(string => bool) public registered;
-    mapping(string => bool) public isDomainActive;
-    string[] public subDomainsList;
+    mapping(bytes32 => bool) public registered;
+    mapping(bytes32 => bool) public isDomainActive;
+    bytes32[] public subDomainsList;
 
 
-    modifier onlySubDomainOwner (string memory _domain) {
+    modifier onlySubDomainOwner (bytes32 _domain) {
         require(subDomainData[_domain].owner == msg.sender, "You are not the owner of this sub-domain");
         _;
     }
 
-    constructor(string memory _domain, address _domainOwner) {
+    constructor(bytes32 _domain, address _domainOwner) {
         parentDomain = _domain;
         registryContractAddr = msg.sender;
         _transferOwnership(_domainOwner);
@@ -44,8 +44,8 @@ contract Registrar is Ownable {
     }
 
     // Gets all the subdomains in use
-    function getAllSubDomains() public view returns(string[] memory) {
-        string[] memory allDomains = new string[](subDomainsList.length);
+    function getAllSubDomains() public view returns(bytes32[] memory) {
+        bytes32[] memory allDomains = new bytes32[](subDomainsList.length);
         uint256 localCounter;
 
         for(uint256 i; i < subDomainsList.length; i++) {
@@ -60,7 +60,7 @@ contract Registrar is Ownable {
         return allDomains;
     }
 
-    function addToSubDomainsList(string memory _subDomain) internal {
+    function addToSubDomainsList(bytes32 _subDomain) internal {
         if(!registered[_subDomain]) {
 
             registered[_subDomain] = true;
@@ -70,16 +70,16 @@ contract Registrar is Ownable {
     }
 
     // owner issues a new domain
-    function setNewSubdomain(string memory _subDomain) public onlyOwner {
+    function setNewSubdomain(bytes32 _subDomain, address _target) public onlyOwner {
         require(!registered[_subDomain], "This subdomain already exists!");
         require(validateName(_subDomain), "This is not a valid domain name!");
 
-        subDomainData[_subDomain] = Data({owner: owner(), description: "_", website: "_", email: "_", avatar:"_"});
         addToSubDomainsList(_subDomain);
+        transferSubDomain(_subDomain, _target);
     }
 
     // transfering a subdomain; sending to owner will reset all the info.
-    function transferSubDomain(string memory _subDomain, address _newOwner) public onlySubDomainOwner(_subDomain) {
+    function transferSubDomain(bytes32 _subDomain, address _newOwner) public onlySubDomainOwner(_subDomain) {
         require(_newOwner != msg.sender, "Can't send domain to yourself!");
 
         if (_newOwner == owner()) {
@@ -104,42 +104,72 @@ contract Registrar is Ownable {
     }
 
     // owner changes its own data
-    function setOwnerData(string memory _description, string memory _website, string memory _email, string memory _avatar) public onlyOwner {
+    function setOwnerData(string memory _description, string memory _website, string memory _email, string memory _avatar) public onlyOwner {        
+        setOwnerDescription(_description);
+        setOwnerWebsite(_website);
+        setOwnerEmail(_email);
+        setOwnerAvatar(_avatar);     
+    }
+
+    function setOwnerDescription(string memory _description) public onlyOwner {
         ownerInfo.description =  _description;
+    }
+
+    function setOwnerWebsite(string memory _website) public onlyOwner {
         ownerInfo.website =  _website;
-        ownerInfo.email = _email;
-        ownerInfo.avatar = _avatar;
+    }
+
+    function setOwnerEmail(string memory _email) public onlyOwner {
+        ownerInfo.email =  _email;
+    }
+
+    function setOwnerAvatar(string memory _avatar) public onlyOwner {
+        ownerInfo.avatar =  _avatar;
     }
 
     //  maybe a backwards resolver?
-    function changeSubDomainData(string memory _subDomain, string memory _description, string memory _website, string memory _email, string memory _avatar) public onlySubDomainOwner(_subDomain) {
-        subDomainData[_subDomain].description =  _description;
-        subDomainData[_subDomain].website =  _website;
+    function changeSubDomainData(bytes32 _subDomain, string memory _description, string memory _website, string memory _email, string memory _avatar) public onlySubDomainOwner(_subDomain) {
+        changeSubdomainDescription(_subDomain, _description);
+        changeSubdomainWebsite(_subDomain, _website);
+        changeSubdomainEmail(_subDomain, _email);
+        changeSubdomainAvatar(_subDomain, _avatar);      
+    }
+
+    function changeSubdomainDescription(bytes32 _subDomain, string memory _description) public onlySubDomainOwner(_subDomain) {
+        subDomainData[_subDomain].description = _description;
+    }
+
+    function changeSubdomainWebsite(bytes32 _subDomain, string memory _website) public onlySubDomainOwner(_subDomain) {
+        subDomainData[_subDomain].website = _website;
+    }
+
+    function changeSubdomainEmail(bytes32 _subDomain, string memory _email) public onlySubDomainOwner(_subDomain) {
         subDomainData[_subDomain].email = _email;
+    }
+
+    function changeSubdomainAvatar(bytes32 _subDomain, string memory _avatar) public onlySubDomainOwner(_subDomain) {
         subDomainData[_subDomain].avatar = _avatar;
     }
 
     // resets all info and tranfers to zero address
-    function deleteSubDomain(string memory _subDomain) public onlySubDomainOwner(_subDomain) {
+    function deleteSubDomain(bytes32 _subDomain) public onlySubDomainOwner(_subDomain) {
         transferSubDomain(_subDomain, owner());
     }
 
-    function validateName(string memory str) internal pure returns (bool) {
-        bytes memory b = bytes(str);
-        if (b.length < 1) return false;
-        if (b.length > 40) return false;
-        if (b[0] == 0x20) return false;
-        if (b[b.length - 1] == 0x20) return false;
+    function validateName(bytes32 _name) internal pure returns (bool) {        
+        if (_name == "") return false;
 
-        for (uint i; i < b.length; i++) {
-            bytes1 char = b[i];
+        for (uint i; i < 32; i++) {
+            bytes1 char = _name[i];
 
             if (char == 0x20) return false;
 
             if (
-                !(char >= 0x30 && char <= 0x39) &&
-                !(char >= 0x61 && char <= 0x7A) &&
-                !(char == 0x2D)
+                !(
+                (char >= 0x30 && char <= 0x39) ||
+                (char >= 0x61 && char <= 0x7A) || 
+                (char == 0x00)
+                )                    
             ) return false;
         }
         return true;

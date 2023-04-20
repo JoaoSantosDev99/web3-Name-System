@@ -25,11 +25,11 @@ contract Registry is ERC721, ERC721Enumerable, Ownable {
         address registrar;
     }
 
-    string constant public TLD = "inu";
+    bytes32 constant public TLD = 0x696e750000000000000000000000000000000000000000000000000000000000;
 
-    mapping(string => Pointer) public registry;
-    mapping(address => string) public primaryDomain;
-    mapping(uint256 => string) public tokenToDomain;
+    mapping(bytes32 => Pointer) public registry;
+    mapping(address => bytes32) public primaryDomain;
+    mapping(uint256 => bytes32) public tokenToDomain;
 
 
     constructor() ERC721("Registry", "INU") {}
@@ -48,12 +48,12 @@ contract Registry is ERC721, ERC721Enumerable, Ownable {
             primaryDomain[to] = tokenToDomain[tokenId];
 
             if ( keccak256(abi.encodePacked(primaryDomain[from])) == keccak256(abi.encodePacked(tokenToDomain[tokenId]))) {
-                primaryDomain[from] = "";
+                primaryDomain[from] = 0;
             }
         }
 
         if (keccak256(abi.encodePacked(primaryDomain[from])) == keccak256(abi.encodePacked(tokenToDomain[tokenId])) ) {
-            primaryDomain[from] = "";
+            primaryDomain[from] = 0;
         }
     }
 
@@ -66,7 +66,7 @@ contract Registry is ERC721, ERC721Enumerable, Ownable {
         return super.supportsInterface(interfaceId);
     }
 
-    function newDomain(string memory _domain) public {
+    function newDomain(bytes32 _domain) public {
         require(checkAvailable(_domain), "This domain is not available");
         require(validateName(_domain), "This is not a valid domain name!");
 
@@ -81,32 +81,30 @@ contract Registry is ERC721, ERC721Enumerable, Ownable {
         _safeMint(msg.sender, tokenId);
 
     }
-    function setPrimaryDomain(string memory _domain) public {
+    function setPrimaryDomain(bytes32 _domain) public {
         require(registry[_domain].owner == msg.sender, "You are not the onwer of this domain!");
         require(keccak256(abi.encodePacked(primaryDomain[msg.sender])) != keccak256(abi.encodePacked(_domain)), "This is already your primary domain!");
         primaryDomain[msg.sender] = _domain;
     }
 
-    function checkAvailable(string memory _domain) public view returns(bool available) {
+    function checkAvailable(bytes32 _domain) public view returns(bool available) {
         return registry[_domain].owner == address(0);
     }
 
-    function validateName(string memory str) internal pure returns (bool) {
-        bytes memory b = bytes(str);
-        if (b.length < 1) return false;
-        if (b.length > 40) return false;
-        if (b[0] == 0x20) return false;
-        if (b[b.length - 1] == 0x20) return false;
+    function validateName(bytes32 _name) internal pure returns (bool) {        
+        if (_name == "") return false;
 
-        for (uint i; i < b.length; i++) {
-            bytes1 char = b[i];
+        for (uint i; i < 32; i++) {
+            bytes1 char = _name[i];
 
             if (char == 0x20) return false;
 
             if (
-                !(char >= 0x30 && char <= 0x39) &&
-                !(char >= 0x61 && char <= 0x7A) &&
-                !(char == 0x2D)
+                !(
+                (char >= 0x30 && char <= 0x39) ||
+                (char >= 0x61 && char <= 0x7A) || 
+                (char == 0x00)
+                )                    
             ) return false;
         }
         return true;
